@@ -1,10 +1,10 @@
 { self, system }:
 let
-  success = name:
+  success = name: cond:
     builtins.derivation {
       inherit name system;
       builder = "/bin/sh";
-      args = [ "-c" "true > $out" ];
+      args = [ "-c" "echo '${toString cond.test}' > $out" ];
     };
   fail = name: cond:
     throw ''
@@ -42,7 +42,7 @@ let
     };
 
   mkTest = name: cond:
-    if runCondition cond then success name else fail name cond;
+    if runCondition cond then success name cond else fail name cond;
 in builtins.mapAttrs (mkTest) {
 
   isNodeTrue = testTrue (self.isNode { name = "node"; });
@@ -73,12 +73,11 @@ in builtins.mapAttrs (mkTest) {
       rootNodeName = "html";
       rootNode = {
         head = {
-          "#priority" = -10;
+          "#priority" = -1;
           title = { "#t" = "Title of document"; };
         };
         body = {
           "#attributes" = { style = "background-color: #00CC00;"; };
-          "#priority" = -5;
           marquee = { "#t" = "Wow, what an awesome webpage"; };
         };
       };
