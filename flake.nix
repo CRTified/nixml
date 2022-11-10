@@ -1,6 +1,16 @@
 {
   inputs = { };
   outputs = { self }: {
+    # A valid node has at least a name
+    # Attributes and child nodes are optional
+    isNode = arg:
+      builtins.foldl' (x: y: x && y) true
+        [
+          (builtins.isAttrs arg)
+          (builtins.hasAttr "name" arg)
+        ];
+        
+    
     xmlStr = { name, attributes ? { }, childs ? [ ] }:
       with builtins;
       let
@@ -12,33 +22,14 @@
       in "<${name}${
         if attributes != { } then " " + attrStr else ""
       }>${childStr}</${name}>";
-    xmlDoc = { docstr, rootNode }: ''
-      ${docstr}
-      ${self.xmlStr rootNode}
-    '';
+    
+    xmlDoc = { xmldecl ? null, rootNode ? null }:
+      (if builtins.isString xmldecl then xmldecl else "") +
+      (if self.isNode rootNode then self.xmlStr rootNode else "");
 
-    demo = self.xmlDoc {
-      docstr = "<!DOCTYPE html>";
-      rootNode = {
-        name = "html";
-        childs = [
-          {
-            name = "head";
-            childs = [{
-              name = "title";
-              childs = [ "Title of document" ];
-            }];
-          }
-          {
-            name = "body";
-            attributes = { style = "background-color: #00CC00;"; };
-            childs = [{
-              name = "marquee";
-              childs = [ "Wow, what an awesome webpage" ];
-            }];
-          }
-        ];
-      };
-    };
+    checks = builtins.listToAttrs (map (name: {
+      inherit name;
+      value = import ./tests { inherit self; };
+    }) [ "x86_64-linux" ]);
   };
 }
