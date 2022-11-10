@@ -16,32 +16,32 @@
       else
         let
           nodeCmp = n1: n2:
-            if hasAttr "#priority" n1 then
-              if hasAttr "#priority" n2 then
-                n1."#priority" < n2."#priority"
+            if hasAttr "-priority" n1 then
+              if hasAttr "-priority" n2 then
+                n1."-priority" < n2."-priority"
               else
-                n1."#priority" < 0
-            else if hasAttr "#priority" n2 then
-              n2."#priority" < 0
+                n1."-priority" < 0
+            else if hasAttr "-priority" n2 then
+              0 < n2."-priority"
             else
               true;
 
           children = sort (n1: n2: nodeCmp content."${n1}" content."${n2}")
-            (filter (f: f != "#attributes" && f != "#priority")
+            (filter (f: f != "-attributes" && f != "-priority")
               (attrNames content));
 
           childStr = concatStringsSep ""
             (map (x: self.xmlStr x content."${x}") children);
 
-          hasAttributes = hasAttr "#attributes" content;
+          hasAttributes = hasAttr "-attributes" content;
 
           attrStr = if hasAttributes then
             " " + (concatStringsSep " "
-              (map (x: ''${x}="${toString content."#attributes"."${x}"}"'')
-                (attrNames content."#attributes")))
+              (map (x: ''${x}="${toString content."-attributes"."${x}"}"'')
+                (attrNames content."-attributes")))
           else
             "";
-        in if substring 0 1 name == "#" then
+        in if substring 0 1 name == "-" then
           concatStringsSep "" (map (x: toString content."${x}") children)
         else
           "<${name}${

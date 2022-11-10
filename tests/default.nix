@@ -66,19 +66,29 @@ in builtins.mapAttrs (mkTest) {
   };
 
   simpleWebpage = testEq {
-    expected = ''
-      <!DOCTYPE html><html><head><title>Title of document</title></head><body style="background-color: #00CC00;"><marquee>Wow, what an awesome webpage</marquee></body></html>'';
+    expected = ''<!DOCTYPE html><html><head><title>Title of document</title></head><body style="background-color: #00CC00;">This is above the marquee.<marquee>Wow, what an awesome webpage</marquee>This is below the marquee.</body></html>'';
+
     test = self.xmlDoc {
       xmldecl = "<!DOCTYPE html>";
       rootNodeName = "html";
       rootNode = {
         head = {
-          "#priority" = -1;
-          title = { "#t" = "Title of document"; };
+          "-priority" = -1;
+          title = { "-t" = "Title of document"; };
         };
         body = {
-          "#attributes" = { style = "background-color: #00CC00;"; };
-          marquee = { "#t" = "Wow, what an awesome webpage"; };
+          "-attributes" = { style = "background-color: #00CC00;"; };
+          marquee = {
+            "-t" = "Wow, what an awesome webpage";
+          };
+          "-b" = {
+            "-priority" = 1;
+            "irrelevant" = "This is below the marquee.";
+          };
+          "-a" = {
+            "-priority" = -1;
+            "irrelevant" = "This is above the marquee.";
+          };
         };
       };
     };
