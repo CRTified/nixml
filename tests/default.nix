@@ -1,9 +1,8 @@
-{ self }:
+{ self, system }:
 let
   success = name:
     builtins.derivation {
-      inherit name;
-      system = builtins.currentSystem;
+      inherit name system;
       builder = "/bin/sh";
       args = [ "-c" "true > $out" ];
     };
@@ -13,13 +12,13 @@ let
       Check ${name} failed.
 
       ---------- EXPECTED VALUE ----------
-      ${cond.expected}
+      ${toString cond.expected}
       ---------- EXPECTED VALUE ----------
 
       ${cond.name}
 
       ----------- FOUND VALUE ------------
-      ${cond.test}
+      ${toString cond.test}
       ----------- FOUND VALUE ------------
     '';
 
@@ -31,23 +30,39 @@ let
   runCondition = { operation, expected, test, ... }: operation expected test;
 
   testEq = mkCondition "equals" (x: y: x == y);
+  testTrue = c:
+    mkCondition "The following is true" (_: y: builtins.isBool y && y) {
+      expected = true;
+      test = c;
+    };
+  testFalse = c:
+    mkCondition "The following is false" (_: y: builtins.isBool y && !y) {
+      expected = false;
+      test = c;
+    };
 
   mkTest = name: cond:
     if runCondition cond then success name else fail name cond;
 in builtins.mapAttrs (mkTest) {
 
+  isNodeTrue = testTrue (self.isNode { name = "node"; });
+  isNotNode1 = testFalse (self.isNode null);
+
   emptyDocument = testEq {
     expected = "";
     test = self.xmlDoc {
       xmldecl = null;
+      rootNodeName = "";
       rootNode = null;
     };
   };
 
   justXMLdeclDocument = testEq {
     expected = ''<?xml version="1.0" encoding="utf-8"?>'';
-    test =
-      self.xmlDoc { xmldecl = ''<?xml version="1.0" encoding="utf-8"?>''; };
+    test = self.xmlDoc {
+      xmldecl = ''<?xml version="1.0" encoding="utf-8"?>'';
+      rootNodeName = "";
+    };
   };
 
   simpleWebpage = testEq {
@@ -55,25 +70,17 @@ in builtins.mapAttrs (mkTest) {
       <!DOCTYPE html><html><head><title>Title of document</title></head><body style="background-color: #00CC00;"><marquee>Wow, what an awesome webpage</marquee></body></html>'';
     test = self.xmlDoc {
       xmldecl = "<!DOCTYPE html>";
+      rootNodeName = "html";
       rootNode = {
-        name = "html";
-        childs = [
-          {
-            name = "head";
-            childs = [{
-              name = "title";
-              childs = [ "Title of document" ];
-            }];
-          }
-          {
-            name = "body";
-            attributes = { style = "background-color: #00CC00;"; };
-            childs = [{
-              name = "marquee";
-              childs = [ "Wow, what an awesome webpage" ];
-            }];
-          }
-        ];
+        head = {
+          "#priority" = -10;
+          title = { "#t" = "Title of document"; };
+        };
+        body = {
+          "#attributes" = { style = "background-color: #00CC00;"; };
+          "#priority" = -5;
+          marquee = { "#t" = "Wow, what an awesome webpage"; };
+        };
       };
     };
   };
