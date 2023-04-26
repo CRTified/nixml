@@ -55,9 +55,34 @@
       else
         "");
 
+    mkNode = name: attributes: children:
+      let
+        mkAttrStr = attrs:
+          if attrs == { } then
+            ""
+          else
+            " " + (builtins.concatStringsSep " " (map
+              (n: ''n="${builtins.toString (builtins.getAttr n attributes)}"'')
+              (builtins.attrNames attributes)));
+      in {
+        inherit name attributes children;
+
+        __toString = self:
+          if children == [ ] then
+            "<${self.name}${mkAttrStr self.attributes}/>"
+          else
+            "<${self.name}${mkAttrStr self.attributes}>${
+              builtins.concatStringsSep ""
+              (map (builtins.toString) self.children)
+            }</${self.name}>";
+      };
+
     checks = builtins.listToAttrs (map (name: {
       inherit name;
-      value = import ./tests { inherit self; system = name; };
+      value = import ./tests {
+        inherit self;
+        system = name;
+      };
     }) [ "x86_64-linux" ]);
   };
 }
