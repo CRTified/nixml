@@ -43,17 +43,13 @@ let
 
   mkTest = name: cond:
     if runCondition cond then success name cond else fail name cond;
+
 in builtins.mapAttrs (mkTest) {
-
-  isNodeTrue = testTrue (self.isNode { name = "node"; });
-  isNotNode1 = testFalse (self.isNode null);
-
   emptyDocument = testEq {
     expected = "";
     test = self.xmlDoc {
       xmldecl = null;
-      rootNodeName = "";
-      rootNode = null;
+      document = { };
     };
   };
 
@@ -61,33 +57,30 @@ in builtins.mapAttrs (mkTest) {
     expected = ''<?xml version="1.0" encoding="utf-8"?>'';
     test = self.xmlDoc {
       xmldecl = ''<?xml version="1.0" encoding="utf-8"?>'';
-      rootNodeName = "";
+      document = { };
     };
   };
 
   simpleWebpage = testEq {
-    expected = ''<!DOCTYPE html><html><head><title>Title of document</title></head><body style="background-color: #00CC00;">This is above the marquee.<marquee>Wow, what an awesome webpage</marquee>This is below the marquee.</body></html>'';
+    expected = ''
+      <!DOCTYPE html><html><head><title>Title of document</title></head><body style="background-color: #00CC00;">This is above the marquee.<marquee>Wow, what an awesome webpage</marquee>This is below the marquee.</body></html>'';
 
     test = self.xmlDoc {
       xmldecl = "<!DOCTYPE html>";
-      rootNodeName = "html";
-      rootNode = {
-        head = {
-          "-priority" = -1;
-          title = { "-t" = "Title of document"; };
-        };
-        body = {
-          "-attributes" = { style = "background-color: #00CC00;"; };
-          marquee = {
-            "-t" = "Wow, what an awesome webpage";
+
+      document = {
+        html = {
+          head = {
+            priority' = -1;
+            title = "Title of document";
           };
-          "-b" = {
-            "-priority" = 1;
-            "irrelevant" = "This is below the marquee.";
-          };
-          "-a" = {
-            "-priority" = -1;
-            "irrelevant" = "This is above the marquee.";
+          body = {
+            attributes' = { style = "background-color: #00CC00;"; };
+            children' = [
+              (self.mkTextNode "This is below the marquee." 1)
+              (self.mkTextNode "This is above the marquee." (-1))
+            ];
+            marquee = "Wow, what an awesome webpage";
           };
         };
       };

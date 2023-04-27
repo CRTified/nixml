@@ -1,88 +1,76 @@
 {
   inputs = { };
-  outputs = { self }: {
-    # A valid node has at least a name
-    # Attributes and child nodes are optional
-    isNode = arg:
-      builtins.all (x: x) [
-        (builtins.isAttrs arg)
-        #(self.isValidTagName arg.name)
-      ];
-
-    xmlStr = name: content:
-      with builtins;
-      if !(isAttrs content) then
-        toString content
-      else
-        let
-          nodeCmp = n1: n2:
-            if hasAttr "-priority" n1 then
-              if hasAttr "-priority" n2 then
-                n1."-priority" < n2."-priority"
-              else
-                n1."-priority" < 0
-            else if hasAttr "-priority" n2 then
-              0 < n2."-priority"
-            else
-              true;
-
-          children = sort (n1: n2: nodeCmp content."${n1}" content."${n2}")
-            (filter (f: f != "-attributes" && f != "-priority")
-              (attrNames content));
-
-          childStr = concatStringsSep ""
-            (map (x: self.xmlStr x content."${x}") children);
-
-          hasAttributes = hasAttr "-attributes" content;
-
-          attrStr = if hasAttributes then
-            " " + (concatStringsSep " "
-              (map (x: ''${x}="${toString content."-attributes"."${x}"}"'')
-                (attrNames content."-attributes")))
-          else
-            "";
-        in if substring 0 1 name == "-" then
-          concatStringsSep "" (map (x: toString content."${x}") children)
+  outputs = { self }:
+    let
+      mkAttrStr = attrs:
+        if attrs == { } then
+          ""
         else
-          "<${name}${
-            if hasAttributes then attrStr else ""
-          }>${childStr}</${name}>";
+          " " + (builtins.concatStringsSep " "
+            (map (n: ''${n}="${builtins.toString (builtins.getAttr n attrs)}"'')
+              (builtins.attrNames attrs)));
 
-    xmlDoc = { xmldecl ? null, rootNodeName, rootNode ? null }:
-      (if builtins.isString xmldecl then xmldecl else "")
-      + (if self.isNode rootNode then
-        self.xmlStr rootNodeName rootNode
-      else
-        "");
-
-    mkNode = name: attributes: children:
-      let
-        mkAttrStr = attrs:
-          if attrs == { } then
+      nodeToStr = self:
+        if self.children == [ ] || self.children == null then
+          "<${self.name}${mkAttrStr self.attributes'}/>"
+        else
+          "<${self.name}${mkAttrStr self.attributes'}>${
+            builtins.concatStringsSep "" (map (builtins.toString) self.children)
+          }</${self.name}>";
+    in {
+      xmlDoc = { xmldecl ? null, document ? { } }:
+        let
+          isValidDocument = builtins.all (x: x)
+            [ ((builtins.length (builtins.attrNames document)) <= 1) ];
+        in if isValidDocument then
+          (if builtins.isString xmldecl then xmldecl else "")
+          + (if document == { } then
             ""
           else
-            " " + (builtins.concatStringsSep " " (map
-              (n: ''n="${builtins.toString (builtins.getAttr n attributes)}"'')
-              (builtins.attrNames attributes)));
-      in {
-        inherit name attributes children;
+            builtins.toString (builtins.elemAt (self.mkNodes document) 0))
+        else
+          throw "Invalid document";
 
-        __toString = self:
-          if children == [ ] then
-            "<${self.name}${mkAttrStr self.attributes}/>"
-          else
-            "<${self.name}${mkAttrStr self.attributes}>${
-              builtins.concatStringsSep ""
-              (map (builtins.toString) self.children)
-            }</${self.name}>";
+      mkTextNode = text: priority': {
+        inherit text priority';
+        __toString = self: self.text;
       };
 
-    checks = builtins.listToAttrs (map (name: {
-      inherit name;
-      value = import ./tests {
-        inherit self;
-        system = name;
-      };
-    }) [ "x86_64-linux" ]);
-  };
+      # Function that takes an attrset and converts it to
+      # "naive" XML where values are textual leaf nodes
+      # and attributes are XML nodes.
+      # Note that there are no guarantees about the order
+      # within one attrset.
+      # mkNodes :: attrset -> [attrset]
+      mkNodes = attrset:
+        with builtins;
+        if attrset == null then
+          [ ]
+        else if !(isAttrs attrset) then
+          [ attrset ]
+        else
+          filter (x: x != null) (map (name:
+            let value = getAttr name attrset;
+            in if elem name [ "priority'" "attributes'" "children'" ] then
+              null
+            else {
+              inherit name;
+              attributes' = value.attributes' or { };
+              priority' = value.priority' or 0;
+              # List of child nodes, sorted (stable) by priority
+              children =
+                sort (e1: e2: (e1.priority' or 0) < (e2.priority' or 0))
+                ((value.children' or [ ]) ++ self.mkNodes value);
+
+              __toString = nodeToStr;
+            }) (attrNames attrset));
+
+      checks = builtins.listToAttrs (map (name: {
+        inherit name;
+        value = import ./tests {
+          inherit self;
+          system = name;
+        };
+      }) [ "x86_64-linux" ]);
+    };
 }
