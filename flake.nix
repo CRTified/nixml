@@ -46,6 +46,8 @@
         with builtins;
         if attrset == null then
           [ ]
+        else if isBool attrset then
+          [ (if attrset then "true" else "false") ]
         else if isList attrset then
           builtins.concatMap (self.mkNodes) attrset
         else if !(isAttrs attrset) then
