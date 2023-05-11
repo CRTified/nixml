@@ -5,7 +5,15 @@
       inherit (builtins)
         concatStringsSep toString getAttr attrNames attrValues all length
         isAttrs isString isBool isList elemAt elem concatMap filter sort
-        listToAttrs;
+        listToAttrs replaceStrings;
+
+      defaultSettings = {
+        boolToString = b: if b then "true" else "false";
+        prettyPrint = false;
+        prettyPrintIndent = 2;
+      };
+
+      optionalStr = cond: s: if cond then s else "";
 
       # Helper function
       # Converts a flat attrset to a space-separated list.
@@ -27,28 +35,47 @@
 
       # Helper function
       # Takes the bare minimum of a node and builds the tag out of it
-      nodeToStr = self:
-        if self.children' == [ ] || self.children' == null then
+      nodeToStr = settings:
+        let
+          ifPP = optionalStr settings.prettyPrint;
+          concatSep = ifPP ("\n" + (concatStringsSep ""
+            (builtins.genList (x: " ") settings.prettyPrintIndent)));
+          renderChild = x:
+            if settings.prettyPrint then
+              replaceStrings [ "\n" ] [ concatSep ] (nodeToStr settings x)
+            else
+              nodeToStr settings x;
+        in self:
+        if !(isAttrs self) then
+          toString self
+        else if "node_text" == ({ __type = "default"; } // self).__type then
+          toString self
+        else if self.children' == [ ] || self.children' == null then
         # We are in the case of an empty tag. Use a short self-closing tag
           "<${self.name}${mkAttrStr self.attributes'}/>"
         else
         # Surround the toString-converted children with the tag
-          "<${self.name}${mkAttrStr self.attributes'}>${
-            concatStringsSep "" (map (toString) self.children')
-          }</${self.name}>";
+          "<${self.name}${mkAttrStr self.attributes'}>${ifPP concatSep}${
+            concatStringsSep concatSep (map (renderChild) self.children')
+          }${ifPP "\n"}</${self.name}>";
     in {
       # Main function to build the XML document.
-      xmlDoc = { xmldecl ? null, document ? { }, settings ? { }}:
+      xmlDoc = { xmldecl ? null, document ? { }, settings ? { } }:
         let
+          finalSettings = defaultSettings // settings;
           isValidDocument = all (x: x) [
+
             ((length (attrNames document))
               <= 1) # XML forbids more than one root node
           ];
         in if isValidDocument then
-          (if isString xmldecl then xmldecl else "") + (if document == { } then
-            ""
+          (if isString xmldecl then
+            (xmldecl + (if finalSettings.prettyPrint then "\n" else ""))
           else
-            toString (elemAt (self.mkNodes settings document) 0))
+            "") + (if document == { } then
+              ""
+            else
+              toString (elemAt (self.mkNodes settings document) 0))
         else
           throw "Invalid document";
 
@@ -57,6 +84,7 @@
       # mkTextNode :: String -> Int -> Node
       mkTextNode = text: priority': {
         inherit text priority';
+        __type = "node_text";
         __toString = self: self.text;
       };
 
@@ -68,12 +96,9 @@
       # than one element.
       #
       # mkNodes :: Either Attrset a -> [Node]
-      mkNodes = settings: target: let
-          finalSettings = {
-            boolToString = b: if b then "true" else "false";
-          } // settings;
-        in
-        if target == null then
+      mkNodes = settings: target:
+        let finalSettings = defaultSettings // settings;
+        in if target == null then
         # No input
           [ ]
         else if isBool target then
@@ -105,7 +130,8 @@
               children' = sort (cmpNodes)
                 ((value.children' or [ ]) ++ self.mkNodes settings value);
 
-              __toString = nodeToStr;
+              __toString = nodeToStr finalSettings;
+              __type = "node";
             }) (attrNames target));
 
       checks = listToAttrs (map (name: {

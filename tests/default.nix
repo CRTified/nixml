@@ -61,6 +61,36 @@ in builtins.mapAttrs (mkTest) {
     };
   };
 
+  simpleTree = testEq {
+    expected = ''
+      <!myDoctype>
+      <a>
+       strstr
+       <b>
+        <asd>1337</asd>
+       </b>
+       <c>
+        thisistrue
+       </c>
+      </a>'';
+
+    test = self.xmlDoc {
+      xmldecl = "<!myDoctype>";
+      settings = {
+        boolToString = b: if b then "thisistrue" else "thisisfalse";
+        prettyPrint = true;
+        prettyPrintIndent = 1;
+      };
+      document = {
+        a = {
+          c = true;
+          b = "<asd>1337</asd>";
+          children' = [ (self.mkTextNode "strstr" (-5)) ];
+        };
+      };
+    };
+  };
+
   simpleWebpage = testEq {
     expected = ''
       <!DOCTYPE html><html><head><title>Title of document</title></head><body style="background-color: #00CC00;">This is above the marquee.<marquee>Wow, what an awesome webpage</marquee>This is below the marquee.</body></html>'';
