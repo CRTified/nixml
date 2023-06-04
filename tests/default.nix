@@ -47,7 +47,7 @@ let
 in builtins.mapAttrs (mkTest) {
   emptyDocument = testEq {
     expected = "";
-    test = self.xmlDoc {
+    test = self.lib.xmlDoc {
       xmldecl = null;
       document = { };
     };
@@ -55,7 +55,7 @@ in builtins.mapAttrs (mkTest) {
 
   justXMLdeclDocument = testEq {
     expected = ''<?xml version="1.0" encoding="utf-8"?>'';
-    test = self.xmlDoc {
+    test = self.lib.xmlDoc {
       xmldecl = ''<?xml version="1.0" encoding="utf-8"?>'';
       document = { };
     };
@@ -74,7 +74,7 @@ in builtins.mapAttrs (mkTest) {
        </c>
       </a>'';
 
-    test = self.xmlDoc {
+    test = self.lib.xmlDoc {
       xmldecl = "<!myDoctype>";
       settings = {
         boolToString = b: if b then "thisistrue" else "thisisfalse";
@@ -85,7 +85,7 @@ in builtins.mapAttrs (mkTest) {
         a = {
           c = true;
           b = "<asd>1337</asd>";
-          children' = [ (self.mkTextNode "strstr" (-5)) ];
+          children' = [ (self.lib.mkTextNode "strstr" (-5)) ];
         };
       };
     };
@@ -95,7 +95,7 @@ in builtins.mapAttrs (mkTest) {
     expected = ''
       <!DOCTYPE html><html><head><title>Title of document</title></head><body style="background-color: #00CC00;">This is above the marquee.<marquee>Wow, what an awesome webpage</marquee>This is below the marquee.</body></html>'';
 
-    test = self.xmlDoc {
+    test = self.lib.xmlDoc {
       xmldecl = "<!DOCTYPE html>";
 
       document = {
@@ -107,8 +107,8 @@ in builtins.mapAttrs (mkTest) {
           body = {
             attributes' = { style = "background-color: #00CC00;"; };
             children' = [
-              (self.mkTextNode "This is below the marquee." 1)
-              (self.mkTextNode "This is above the marquee." (-1))
+              (self.lib.mkTextNode "This is below the marquee." 1)
+              (self.lib.mkTextNode "This is above the marquee." (-1))
             ];
             marquee = "Wow, what an awesome webpage";
           };
